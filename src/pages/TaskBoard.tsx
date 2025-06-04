@@ -186,7 +186,7 @@ const TaskBoard: React.FC = () => {
   return (
     <div className="task-board">
       
-      <Navbar />
+      
       {/* Header */}
       <div className="header">
         <div className="header-left">
@@ -203,6 +203,7 @@ const TaskBoard: React.FC = () => {
           />
         </div>
       </div>
+      <Navbar />
       
 
       <div className="main-container">
