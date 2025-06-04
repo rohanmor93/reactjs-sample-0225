@@ -217,7 +217,7 @@ const TaskBoard: React.FC = () => {
       {/* Header */}
       <div className="header">
         <div className="header-left">
-          <div className="app-icon">📋</div>
+          <div className="app-icon">⛓</div>
           <h1>BlockTask</h1>
         </div>
         <div className="header-right">

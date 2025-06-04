@@ -3,7 +3,7 @@ import { auth } from "../firebase/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import "../styles/AuthForm.css";
-
+import Header from "../pages/Header";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -13,7 +13,6 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       navigate("/tasks");
@@ -24,40 +23,41 @@ const Login = () => {
         setError("No user found with this email.");
       } else if (err.code === "auth/wrong-password") {
         setError("Incorrect password.");
-      }else if(err.code =="auth/network-request-failed"){
-        setError("Check Network Connection")
-      }
-       else {
+      } else if (err.code === "auth/network-request-failed") {
+        setError("Check Network Connection");
+      } else {
         setError("Login failed: " + err.message);
       }
     }
   };
-  
 
   return (
-    <div className="auth-container">
-      <div className="auth-box">
-        <h2>Log In</h2>
-        <form onSubmit={handleLogin}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button type="submit">Log In</button>
-          {error && <p>{error}</p>}
-        </form>
+    <>
+      <Header />
+      <div className="auth-container">
+        <div className="auth-box">
+          <h2>Log In</h2>
+          <form onSubmit={handleLogin}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button type="submit">Log In</button>
+            {error && <p>{error}</p>}
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

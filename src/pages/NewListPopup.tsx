@@ -37,14 +37,14 @@ const NewListPopup: React.FC<Props> = ({ setShowPopup, refreshTaskLists }) => {
   return (
     <div className="popup-overlay">
       <div className="popup-container">
-        <h3>Create New List</h3>
+        <h3>Create New List</h3><p> </p>
         <input
           type="text"
           placeholder="List name"
           value={listName}
           onChange={(e) => setListName(e.target.value)}
         />
-        <button onClick={handleCreateList}>Create</button>
+        <button onClick={handleCreateList}>Create</button><p> </p>
         <button onClick={() => setShowPopup(false)}>Cancel</button>
       </div>
     </div>
