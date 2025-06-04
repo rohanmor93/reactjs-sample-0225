@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
+    "jsx": "react-jsx",                             
+    "incremental": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": ["DOM", "ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -19,7 +21,10 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* Custom type definitions */
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "src"]
 }

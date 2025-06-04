@@ -14,6 +14,8 @@ import {
 } from "firebase/firestore";
 import NewListPopup from "../pages/NewListPopup";
 import "../styles/AuthForm.css";
+import Navbar from "../components/Navbar";
+
 
 interface Task {
   id: string;
@@ -36,18 +38,23 @@ const TaskBoard: React.FC = () => {
   const [newTask, setNewTask] = useState("");
   const [showPopup, setShowPopup] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
-  
-  // Enhanced UI state
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [showTaskOptions, setShowTaskOptions] = useState<string | null>(null);
   const [showListOptions, setShowListOptions] = useState<string | null>(null);
+  const [user, setUser] = useState(auth.currentUser);
 
-  const user = auth.currentUser ;
+  // Listen to Firebase Auth
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // Fetch task lists
-  const fetchTaskLists = () => {
+  // Fetch Task Lists
+  useEffect(() => {
     if (!user) return;
 
     const q = query(
@@ -57,15 +64,12 @@ const TaskBoard: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const lists: TaskList[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name,
-          createdAt: data.createdAt,
-          userId: data.userId,
-        };
-      });
+      const lists: TaskList[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+        createdAt: doc.data().createdAt,
+        userId: doc.data().userId,
+      }));
 
       setTaskLists(lists);
 
@@ -75,25 +79,9 @@ const TaskBoard: React.FC = () => {
     });
 
     return () => unsubscribe();
-  };
+  }, [user]);
 
-  // Listen for authentication state changes
-  useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      if (user) {
-        fetchTaskLists();
-      } else {
-        // Clear task lists and tasks when user logs out
-        setTaskLists([]);
-        setActiveListId(null);
-        setTasks([]);
-      }
-    });
-
-    return () => unsubscribeAuth();
-  }, []);
-
-  // Fetch tasks from the active list
+  // Fetch Tasks
   useEffect(() => {
     if (!user || !activeListId) return;
 
@@ -105,70 +93,56 @@ const TaskBoard: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasks: Task[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          text: data.text,
-          completed: data.completed,
-          userId: data.userId,
-        };
-      });
-
-      setTasks(tasks);
+      const fetchedTasks: Task[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        text: doc.data().text,
+        completed: doc.data().completed,
+        userId: doc.data().userId,
+      }));
+      setTasks(fetchedTasks);
       setLoadingTasks(false);
     });
 
     return () => unsubscribe();
   }, [user, activeListId]);
 
-  // Add a task to current list
   const addTask = async () => {
     if (!newTask.trim() || !user || !activeListId) return;
-  
+
     try {
       await addDoc(collection(db, "lists", activeListId, "tasks"), {
         text: newTask.trim(),
         completed: false,
         createdAt: serverTimestamp(),
-        userId: user.uid, // Set the userId to the authenticated user's ID
+        userId: user.uid,
       });
       setNewTask("");
       setIsAddingTask(false);
-    } catch (error) {
-      console.error("Error adding task:", error);
+    } catch (err) {
+      console.error("Failed to add task:", err);
     }
   };
-  
 
-  // Toggle completion status
-  const toggleComplete = async (taskId: string, currentStatus: boolean) => {
+  const toggleComplete = async (taskId: string, current: boolean) => {
     if (!user || !activeListId) return;
-
     const taskRef = doc(db, "lists", activeListId, "tasks", taskId);
-    await updateDoc(taskRef, {
-      completed: !currentStatus,
-    });
+    await updateDoc(taskRef, { completed: !current });
   };
 
-  // Delete a task
   const deleteTask = async (taskId: string) => {
     if (!user || !activeListId) return;
-
-    const taskRef = doc(db, "lists", activeListId, "tasks", taskId);
-    await deleteDoc(taskRef);
+    await deleteDoc(doc(db, "lists", activeListId, "tasks", taskId));
     setShowTaskOptions(null);
   };
 
-  // Delete a list
   const deleteList = async (listId: string) => {
     if (!user) return;
-
-    const listRef = doc(db, "lists", listId);
-    await deleteDoc(listRef);
+    await deleteDoc(doc(db, "lists", listId));
+    if (activeListId === listId) {
+      setActiveListId(null);
+    }
   };
 
-  // Edit task functionality
   const startEdit = (task: Task) => {
     setEditingTaskId(task.id);
     setEditText(task.text);
@@ -176,44 +150,43 @@ const TaskBoard: React.FC = () => {
   };
 
   const saveEdit = async () => {
-    if (!editText.trim() || !user || !activeListId) return;
-
-    const taskRef = doc(db, "lists", activeListId, "tasks", editingTaskId!);
-    await updateDoc(taskRef, {
-      text: editText.trim(),
-    });
-
+    if (!editText.trim() || !user || !activeListId || !editingTaskId) return;
+    const taskRef = doc(db, "lists", activeListId, "tasks", editingTaskId);
+    await updateDoc(taskRef, { text: editText.trim() });
     setEditingTaskId(null);
-    setEditText('');
+    setEditText("");
   };
 
   const cancelEdit = () => {
     setEditingTaskId(null);
-    setEditText('');
+    setEditText("");
   };
 
-  // Keyboard handlers
-  const handleKeyPress = (e: React.KeyboardEvent, action: () => void) => {
-    if (e.key === 'Enter') {
-      action();
-    } else if (e.key === 'Escape') {
+  const handleKeyPress = (
+    e: React.KeyboardEvent,
+    action: () => void
+  ) => {
+    if (e.key === "Enter") action();
+    else if (e.key === "Escape") {
       if (action === addTask) {
         setIsAddingTask(false);
-        setNewTask('');
+        setNewTask("");
       } else {
         cancelEdit();
       }
     }
   };
 
-  // Get active list name
   const getActiveListName = () => {
-    const activeList = taskLists.find(list => list.id === activeListId);
-    return activeList ? activeList.name : 'Tasks';
+    return taskLists.find((list) => list.id === activeListId)?.name || "Tasks";
   };
+
+  if (!user) return <div className="loading-container">Loading user...</div>;
 
   return (
     <div className="task-board">
+      
+      <Navbar />
       {/* Header */}
       <div className="header">
         <div className="header-left">
@@ -221,23 +194,23 @@ const TaskBoard: React.FC = () => {
           <h1>BlockTask</h1>
         </div>
         <div className="header-right">
-          <span className="username">{user?.email}</span>
+          <span className="username">{user.email}</span>
           <img
-            src={`https://picsum.photos/seed/${user?.uid}/40`}
+            src={`https://picsum.photos/seed/${user.uid}/40`}
             alt="Profile"
             className="profile-image"
-            title={user?.email ?? "User "}
+            title={user.email ?? "User"}
           />
         </div>
       </div>
+      
 
       <div className="main-container">
-        {/* Sidebar - Task Lists */}
+        {/* Sidebar */}
         <div className="sidebar">
           <div className="sidebar-header">
             <h3>Your Lists</h3>
           </div>
-
           {taskLists.length === 0 ? (
             <div className="empty-lists">
               <span className="empty-icon">📋</span>
@@ -248,7 +221,7 @@ const TaskBoard: React.FC = () => {
               {taskLists.map((list) => (
                 <div key={list.id} className="list-item-wrapper">
                   <div
-                    className={`list-item ${list.id === activeListId ? 'active' : ''}`}
+                    className={`list-item ${list.id === activeListId ? "active" : ""}`}
                     onClick={() => setActiveListId(list.id)}
                   >
                     <span className="list-name">{list.name}</span>
@@ -262,13 +235,10 @@ const TaskBoard: React.FC = () => {
                       ⋮
                     </button>
                   </div>
-                  
                   {showListOptions === list.id && (
                     <div className="options-dropdown">
-                      <button className="option-btn edit-option">
-                        ✏️ Rename
-                      </button>
-                      <button 
+                      <button className="option-btn edit-option">✏️ Rename</button>
+                      <button
                         className="option-btn delete-option"
                         onClick={() => deleteList(list.id)}
                       >
@@ -280,76 +250,59 @@ const TaskBoard: React.FC = () => {
               ))}
             </div>
           )}
-
-          <button
-            className="create-list-btn"
-            onClick={() => setShowPopup(true)}
-          >
+          <button className="create-list-btn" onClick={() => setShowPopup(true)}>
             ➕ Create New List
           </button>
         </div>
 
-        {/* Main Content - Tasks */}
+        {/* Main Content */}
         <div className="main-content">
           <div className="tasks-container">
             <div className="tasks-header">
               <h2>{getActiveListName()}</h2>
               <div className="task-stats">
-                {tasks.length > 0 && (
-                  <>
-                    {tasks.filter(t => t.completed).length} of {tasks.length} completed
-                  </>
-                )}
+                {tasks.length > 0 &&
+                  `${tasks.filter((t) => t.completed).length} of ${tasks.length} completed`}
               </div>
             </div>
 
-            {/* Add Task Section */}
-            {activeListId && (
-              <div className="add-task-section">
-                {isAddingTask ? (
-                  <div className="add-task-form">
-                    <input
-                      type="text"
-                      placeholder="Enter new task..."
-                      value={newTask}
-                      onChange={(e) => setNewTask(e.target.value)}
-                      onKeyDown={(e) => handleKeyPress(e, addTask)}
-                      className="task-input"
-                      autoFocus
-                    />
-                    <button
-                      onClick={addTask}
-                      disabled={!newTask.trim()}
-                      className="add-btn"
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsAddingTask(false);
-                        setNewTask('');
-                      }}
-                      className="cancel-btn"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsAddingTask(true)}
-                    className="add-task-placeholder"
-                  >
-                    <div className="add-task-icon">➕</div>
-                    <span>Add new task</span>
-                  </button>
-                )}
+            {/* Add Task */}
+            {isAddingTask ? (
+              <div className="add-task-form">
+                <input
+                  type="text"
+                  placeholder="Enter new task..."
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  onKeyDown={(e) => handleKeyPress(e, addTask)}
+                  className="task-input"
+                  autoFocus
+                />
+                <button
+                  onClick={addTask}
+                  disabled={!newTask.trim()}
+                  className="add-btn"
+                >
+                  Add
+                </button>
+                <button onClick={cancelEdit} className="cancel-btn">
+                  Cancel
+                </button>
               </div>
+            ) : (
+              <button
+                onClick={() => setIsAddingTask(true)}
+                className="add-task-placeholder"
+              >
+                <div className="add-task-icon">➕</div>
+                <span>Add new task</span>
+              </button>
             )}
 
-            {/* Tasks List */}
+            {/* Tasks */}
             {loadingTasks ? (
               <div className="loading-container">
-                <div className="spinner"></div>
+                <div className="spinner" />
                 <p>Loading tasks...</p>
               </div>
             ) : tasks.length === 0 ? (
@@ -372,27 +325,25 @@ const TaskBoard: React.FC = () => {
                           className="edit-input"
                           autoFocus
                         />
-                        <button onClick={saveEdit} className="save-btn">
-                          ✔️
-                        </button>
-                        <button onClick={cancelEdit} className="cancel-edit-btn">
-                          ❌
-                        </button>
+                        <button onClick={saveEdit} className="save-btn">✔️</button>
+                        <button onClick={cancelEdit} className="cancel-edit-btn">❌</button>
                       </div>
                     ) : (
                       <div className="task-item">
                         <button
                           onClick={() => toggleComplete(task.id, task.completed)}
-                          className={`task-checkbox ${task.completed ? 'completed' : ''}`}
+                          className={`task-checkbox ${task.completed ? "completed" : ""}`}
                         >
                           {task.completed && <span>✔️</span>}
                         </button>
-                        <span className={`task-text ${task.completed ? 'completed' : ''}`}>
+                        <span className={`task-text ${task.completed ? "completed" : ""}`}>
                           {task.text}
                         </span>
                         <div className="task-options">
                           <button
-                            onClick={() => setShowTaskOptions(showTaskOptions === task.id ? null : task.id)}
+                            onClick={() => setShowTaskOptions(
+                              showTaskOptions === task.id ? null : task.id
+                            )}
                             className="task-options-btn"
                           >
                             ⋮
@@ -421,7 +372,7 @@ const TaskBoard: React.FC = () => {
               </div>
             )}
 
-            {/* Progress Bar */}
+            {/* Progress */}
             {tasks.length > 0 && (
               <div className="progress-section">
                 <div className="progress-info">
@@ -429,9 +380,11 @@ const TaskBoard: React.FC = () => {
                   <span>{Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}%</span>
                 </div>
                 <div className="progress-bar">
-                  <div 
+                  <div
                     className="progress-fill"
-                    style={{ width: `${(tasks.filter(t => t.completed).length / tasks.length) * 100}%` }}
+                    style={{
+                      width: `${(tasks.filter(t => t.completed).length / tasks.length) * 100}%`,
+                    }}
                   ></div>
                 </div>
               </div>
@@ -440,7 +393,8 @@ const TaskBoard: React.FC = () => {
         </div>
       </div>
 
-      {showPopup && <NewListPopup setShowPopup={setShowPopup} refreshTaskLists={fetchTaskLists} />}
+      {/* Popup */}
+      {showPopup && <NewListPopup setShowPopup={setShowPopup} refreshTaskLists={() => {}} />}
     </div>
   );
 };
