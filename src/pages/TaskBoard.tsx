@@ -69,7 +69,7 @@ const TaskBoard: React.FC = () => {
   
         const mintResult = await mintNFTBadge(signer);
         if (mintResult.success) {
-          alert(" NFT Badge minted successfully!");
+          alert("  wooohooo !! NFT Badge minted successfully!");
         } else {
           alert(" NFT Badge minted Successfully");
         }
