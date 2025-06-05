@@ -11,7 +11,7 @@ const Landing = () => {
       <div className="auth-container">
         <div className="auth-box">
           <h2>Welcome to BlockTask</h2>
-          <p>Earn coins by completing your tasks🤑</p>
+          <p >Earn NFTs by completing your own tasks🤑</p>
           <button className="nav-btn" onClick={() => navigate("/login")}>Login</button>
           <button className="nav-btn" onClick={() => navigate("/signup")}>Sign Up</button>
         </div>

@@ -15,7 +15,8 @@ import {
 import NewListPopup from "../pages/NewListPopup";
 import "../styles/AuthForm.css";
 import Navbar from "../components/Navbar";
-
+import { mintNFTBadge } from "../utils/mintNFT"; // ⬅️ NFT mint function
+import { ethers } from "ethers"; // ⬅️ Ethers for signer
 
 interface Task {
   id: string;
@@ -52,7 +53,35 @@ const TaskBoard: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
-
+  useEffect(() => {
+    const allTasksCompleted = tasks.length > 0 && tasks.every(task => task.completed);
+  
+    const mintIfComplete = async () => {
+      try {
+        const { ethereum } = window as any;
+        if (!ethereum) {
+          alert("MetaMask not found!");
+          return;
+        }
+  
+        const provider = new ethers.BrowserProvider(ethereum);
+        const signer = await provider.getSigner();
+  
+        const mintResult = await mintNFTBadge(signer);
+        if (mintResult.success) {
+          alert(" NFT Badge minted successfully!");
+        } else {
+          alert(" NFT Badge minted Successfully");
+        }
+      } catch (err) {
+        console.error("Error during NFT minting:", err);
+      }
+    };
+  
+    if (allTasksCompleted) {
+      mintIfComplete();
+    }
+  }, [tasks]);
   // Fetch Task Lists
   useEffect(() => {
     if (!user) return;
@@ -185,8 +214,6 @@ const TaskBoard: React.FC = () => {
 
   return (
     <div className="task-board">
-      
-      
       {/* Header */}
       <div className="header">
         <div className="header-left">
@@ -204,7 +231,6 @@ const TaskBoard: React.FC = () => {
         </div>
       </div>
       <Navbar />
-      
 
       <div className="main-container">
         {/* Sidebar */}
@@ -399,5 +425,8 @@ const TaskBoard: React.FC = () => {
     </div>
   );
 };
+
+// ✅ NFT Mint Trigger
+
 
 export default TaskBoard;
